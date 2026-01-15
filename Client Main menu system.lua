@@ -60,7 +60,7 @@ performance.Kills.TextLabel.Text = data.Kills
 performance.Deaths.TextLabel.Text = data.Deaths
 performance.KD.TextLabel.Text = string.format("%0.2f", data.Kills / data.Deaths)
 
-if accuracy ~= accuracy then
+if accuracy ~= accuracy then --if accuracy is NaN, this check fails
 	accuracy = "100"
 end
 
@@ -72,7 +72,7 @@ combatstats.Headshots.val.Text = data.Headshots
 
 combatstats.Playtime.val.Text = string.format("%02dh:%02dm", hours, minutes)
 
-if winrate ~= winrate then
+if winrate ~= winrate then --if accuracy is NaN, this check fails
 	winrate = "100%"
 end
 
