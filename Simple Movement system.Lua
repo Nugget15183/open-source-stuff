@@ -51,8 +51,8 @@ local state = {--store variables in here to keep the global scope of the script 
 	walkspeed = 16;--base walkspeed to use during regular walking
 	crouch_walkspeed = 8;--walkspeed to be used during crouching
 	sprint_walkspeed = 24;--walkspeed to be used whilst sprinting
-	crouch_hip_height = 1; --change hip height so the player can actually fit through smaller areas
-	hip_height = 2;--normal hip height
+	crouch_hip_height = -.5; --change hip height so the player can actually fit through smaller areas
+	hip_height = 0;--normal hip height
 	max_stamina = 100;--a base max stamina
 	stamina_loss_rate = 1;--amount of stamina we loose while sprinting and performing other actions
 	stamina_regen_timer = 5;--time in seconds after the last stamina usage that we start regenerating stamina
@@ -100,23 +100,23 @@ function changeState(newstate)
 
 	if state.activeAnimationTrack then
 		state.activeAnimationTrack:Stop()--stop the current animation
-		local newtrack
-
-		--loading the new animationtrack depending on what state the player is in
-		if newstate == playerstates.CROUCHED then
-			newtrack = animator:LoadAnimation(assets.animations.crouch)
-		elseif newstate == playerstates.STANDING then
-			newtrack = nil
-		elseif newstate == playerstates.SPRINTING then
-			newtrack = animator:LoadAnimation(assets.animations.sprint)
-		end
-
-		if newtrack then--newtrack may not exist if we are just standing (when we set it to nil)
-			newtrack:Play()--start the new one and save it
-		end
-
-		state.activeAnimationTrack = newtrack--saving it
 	end
+	
+	local newtrack
+	--loading the new animationtrack depending on what state the player is in
+	if newstate == playerstates.CROUCHED then
+		newtrack = animator:LoadAnimation(assets.animations.crouch)
+	elseif newstate == playerstates.STANDING then
+		newtrack = nil
+	elseif newstate == playerstates.SPRINTING then
+		newtrack = animator:LoadAnimation(assets.animations.sprint)
+	end
+
+	if newtrack then--newtrack may not exist if we are just standing (when we set it to nil)
+		newtrack:Play()--start the new one and save it
+	end
+
+	state.activeAnimationTrack = newtrack--saving it
 end
 
 function randecimal(rawmin, rawmax, decimalplaces)
@@ -142,11 +142,17 @@ function randecimal(rawmin, rawmax, decimalplaces)
 end
 
 function returnToDefaultState(LerpPercent)--we make this a function because we use it in more places then one
+	changeState(playerstates.STANDING)
+	
+	--reset fov, walkspeed and hipheight
 	local targetFOV = state.fov
 	camera.FieldOfView = lerp(camera.FieldOfView, targetFOV, LerpPercent)
 
 	local targetWalkspeed = state.walkspeed
 	humanoid.WalkSpeed = lerp(humanoid.WalkSpeed, targetWalkspeed, LerpPercent)
+	
+	local hipHeight = state.hip_height
+	humanoid.HipHeight = lerp(humanoid.HipHeight, hipHeight, LerpPercent)
 end
 
 userinputservice.InputBegan:Connect(function(input, gpe)--when you PRESS a key this function fires
@@ -245,15 +251,16 @@ runservice.RenderStepped:Connect(function(deltatime)
 		
 		if state.wasFalling then
 			local falldist = math.abs(state.fallingfrom - root.Position.Y)
-			if falldist < 10 then return end --if we fall less then 10 studs, do nothing
-			humanoid.Health -= falldist / 2--calculate damage to deal
-			state.wasFalling = false -- Reset AFTER calculating damage
+			if falldist > 10 then --if we fall less then 10 studs, do nothing
+				humanoid.Health -= falldist / 2--calculate damage to deal
+			end
+			state.wasFalling = false --reset state
 		end
 	else--moving down, so increase walkspeed
 		newWalkspeed += 1--same principle from above, (operator)= works with all math operators
 		
 		if not state.wasFalling then
-			state.wasFalling = true
+			state.wasFalling = true--set falling to true so that the next function call knows that we're falling
 			state.fallingfrom = root.Position.Y--update the fallingfrom position, otherwise the falldist calculation will be off
 		end
 	end
@@ -315,4 +322,15 @@ runservice.RenderStepped:Connect(function(deltatime)
 	if humanoid.Health <= 0 then--if the player is dead then set them to be dead
 		state.playerstate = playerstates.DEAD
 	end
+	
+	--lets make animations pause while standing still and play while moving
+	if state.activeAnimationTrack then--is there a valid animation?
+		if humanoid.MoveDirection.Magnitude > 0 then--is the player walking?
+			state.activeAnimationTrack:AdjustSpeed(1)--play animation
+		else
+			state.activeAnimationTrack:AdjustSpeed(0)--pause animation
+		end
+	end
+	
+	print(state.playerstate)
 end)
